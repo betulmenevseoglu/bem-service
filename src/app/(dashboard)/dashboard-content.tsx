@@ -1,20 +1,25 @@
 'use client'
 import Link from 'next/link'
-import { Profile, IsEmriWithDetails, IS_TIPI_LABELS, IS_EMRI_DURUM_LABELS, IsEmriDurumu } from '@/types'
+import { Profile, IS_TIPI_LABELS, IS_EMRI_DURUM_LABELS, IsEmriDurumu } from '@/types'
 import { formatTarih } from '@/lib/tarih'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card' // CardHeader/CardTitle: iş emirleri tablosu için
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Briefcase, CheckCircle2, Clock, Plus, ArrowRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
+import { cn } from '@/lib/utils'
 
 interface Props {
   profile: Profile
   isEmirleri: any[]
   kpi: { toplam: number; tamamlanan: number; bekleyen: number; aktiveMuhendis: number }
+  bugunIsEmirleri: any[]
+  bugunIzinler: any[]
 }
+
+
 
 const durumRengi: Record<IsEmriDurumu, string> = {
   atandi: 'bg-slate-100 text-slate-700',
@@ -24,15 +29,20 @@ const durumRengi: Record<IsEmriDurumu, string> = {
   iptal_edildi: 'bg-gray-100 text-gray-500',
 }
 
-export function DashboardContent({ profile, isEmirleri, kpi }: Props) {
-  const bugun = format(new Date(), "d MMMM yyyy, EEEE", { locale: tr })
+export function DashboardContent({ profile, isEmirleri, kpi, bugunIsEmirleri, bugunIzinler }: Props) {
+  const now = new Date()
+  const bugunStr = format(now, "d MMMM yyyy, EEEE", { locale: tr })
+  const bugunGun = format(now, 'd')
+  const bugunAy  = format(now, 'MMM', { locale: tr }).toUpperCase()
   const isYonetici = profile.rol === 'yonetici'
+
+  const toplamEtkinlik = bugunIsEmirleri.length + bugunIzinler.length
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Hoş geldin, {profile.ad_soyad.split(' ')[0]} 👋</h1>
-        <p className="text-muted-foreground mt-1">{bugun}</p>
+        <p className="text-muted-foreground mt-1 capitalize">{bugunStr}</p>
       </div>
 
       {/* KPI Cards */}
@@ -84,6 +94,50 @@ export function DashboardContent({ profile, isEmirleri, kpi }: Props) {
           </CardContent>
         </Card>
 
+        {/* 4. Kart — Bugünün Programı */}
+        <Link href="/takvim" className="block">
+          <Card className="h-full cursor-pointer hover:shadow-md hover:border-[#1FBFB8]/40 transition-all">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">Bugünün Programı</p>
+                  <p className="text-3xl font-bold mt-1">{toplamEtkinlik}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {toplamEtkinlik === 0 ? 'etkinlik yok' : 'etkinlik planlandı'}
+                  </p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-[#1FBFB8]/10 flex flex-col items-center justify-center shrink-0">
+                  <span className="text-[8px] font-bold text-[#1FBFB8] leading-none tracking-widest">{bugunAy}</span>
+                  <span className="text-lg font-bold text-[#1FBFB8] leading-tight">{bugunGun}</span>
+                </div>
+              </div>
+
+              {/* Kompakt etkinlik özeti */}
+              {toplamEtkinlik > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {bugunIsEmirleri.slice(0, 2).map((ie: any) => (
+                    <div key={ie.id} className="flex items-center gap-1.5 text-xs">
+                      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0',
+                        ie.durum === 'devam_ediyor' ? 'bg-blue-500' :
+                        ie.durum === 'tamamlandi'   ? 'bg-[#1FBFB8]' : 'bg-amber-500'
+                      )} />
+                      <span className="truncate text-muted-foreground">{ie.proje?.ad ?? '—'}</span>
+                    </div>
+                  ))}
+                  {bugunIzinler.slice(0, 1).map((iz: any) => (
+                    <div key={iz.id} className="flex items-center gap-1.5 text-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />
+                      <span className="truncate text-muted-foreground">{iz.muhendis?.ad_soyad} · İzin</span>
+                    </div>
+                  ))}
+                  {toplamEtkinlik > 3 && (
+                    <p className="text-xs text-muted-foreground pl-3">+{toplamEtkinlik - 3} daha</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Quick Actions */}

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { LayoutDashboard, ClipboardList, Building2, Calendar, BarChart3, Users, LogOut, X, UserCircle } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, Building2, Calendar, CalendarDays, BarChart3, Users, LogOut, X, UserCircle } from 'lucide-react'
 
 interface SidebarProps {
   open: boolean
@@ -13,12 +13,13 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { href: '/', label: 'Ana Panel', icon: LayoutDashboard, roles: ['yonetici', 'saha_muhendisi'] },
-  { href: '/is-emirleri', label: 'İş Emirleri', icon: ClipboardList, roles: ['yonetici', 'saha_muhendisi'] },
-  { href: '/projeler', label: 'Projeler', icon: Building2, roles: ['yonetici'] },
-  { href: '/izinler', label: 'İzinler', icon: Calendar, roles: ['yonetici', 'saha_muhendisi'] },
-  { href: '/raporlar', label: 'Raporlar', icon: BarChart3, roles: ['yonetici'] },
-  { href: '/kullanicilar', label: 'Kullanıcılar', icon: Users, roles: ['yonetici'] },
+  { href: '/',           label: 'Ana Panel',   icon: LayoutDashboard, roles: ['yonetici', 'saha_muhendisi'] },
+  { href: '/is-emirleri',label: 'İş Emirleri', icon: ClipboardList,   roles: ['yonetici', 'saha_muhendisi'] },
+  { href: '/takvim',     label: 'Takvim',      icon: CalendarDays,    roles: ['yonetici', 'saha_muhendisi'] },
+  { href: '/projeler',   label: 'Projeler',    icon: Building2,       roles: ['yonetici'] },
+  { href: '/izinler',    label: 'İzinler',     icon: Calendar,        roles: ['yonetici', 'saha_muhendisi'] },
+  { href: '/raporlar',   label: 'Raporlar',    icon: BarChart3,       roles: ['yonetici'] },
+  { href: '/kullanicilar',label: 'Kullanıcılar',icon: Users,          roles: ['yonetici'] },
 ]
 
 export function Sidebar({ open, onClose }: SidebarProps) {

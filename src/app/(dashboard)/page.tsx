@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { DashboardContent } from './dashboard-content'
 
@@ -50,6 +51,44 @@ export default async function DashboardPage() {
     .eq('rol', 'saha_muhendisi')
     .eq('aktif', true)
 
+  // ── Bugünün etkinlikleri ────────────────────────────────
+  const admin = createAdminClient()
+  const todayStr = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+
+  // Planlanan aralığı bugünü kapsayan iş emirleri
+  let bugunIsEmriQuery = admin
+    .from('is_emirleri')
+    .select('id, durum, proje:projeler(ad), muhendisler:is_emri_muhendisleri(muhendis:profiles(ad_soyad))')
+    .lte('planlanan_baslangic', `${todayStr}T23:59:59`)
+    .gte('planlanan_bitis', `${todayStr}T00:00:00`)
+    .neq('durum', 'iptal_edildi')
+
+  if (profile.rol === 'saha_muhendisi') {
+    const { data: atananlar } = await admin
+      .from('is_emri_muhendisleri')
+      .select('is_emri_id')
+      .eq('muhendis_id', user.id)
+    const ids = (atananlar ?? []).map((a: any) => a.is_emri_id)
+    if (ids.length > 0) bugunIsEmriQuery = bugunIsEmriQuery.in('id', ids)
+    else bugunIsEmriQuery = bugunIsEmriQuery.in('id', ['_']) // boş sonuç
+  }
+
+  const { data: bugunIsEmirleri } = await bugunIsEmriQuery
+
+  // Bugünü kapsayan onaylı izinler
+  let bugunIzinQuery = admin
+    .from('izin_talepleri')
+    .select('id, izin_turu, muhendis:profiles!muhendis_id(ad_soyad)')
+    .lte('baslangic_tarihi', todayStr)
+    .gte('bitis_tarihi', todayStr)
+    .eq('durum', 'onaylandi')
+
+  if (profile.rol === 'saha_muhendisi') {
+    bugunIzinQuery = bugunIzinQuery.eq('muhendis_id', user.id)
+  }
+
+  const { data: bugunIzinler } = await bugunIzinQuery
+
   return (
     <DashboardContent
       profile={profile}
@@ -60,6 +99,8 @@ export default async function DashboardPage() {
         bekleyen: bekleyenCount ?? 0,
         aktiveMuhendis: muhendisCount ?? 0,
       }}
+      bugunIsEmirleri={(bugunIsEmirleri ?? []) as any[]}
+      bugunIzinler={(bugunIzinler ?? []) as any[]}
     />
   )
 }
