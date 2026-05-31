@@ -16,6 +16,7 @@ const navItems = [
   { href: '/',           label: 'Ana Panel',   icon: LayoutDashboard, roles: ['yonetici', 'saha_muhendisi'] },
   { href: '/is-emirleri',label: 'İş Emirleri', icon: ClipboardList,   roles: ['yonetici', 'saha_muhendisi'] },
   { href: '/takvim',     label: 'Takvim',      icon: CalendarDays,    roles: ['yonetici', 'saha_muhendisi'] },
+  { href: '/musteriler', label: 'Müşteriler',  icon: Users,           roles: ['yonetici'] },
   { href: '/projeler',   label: 'Projeler',    icon: Building2,       roles: ['yonetici'] },
   { href: '/izinler',    label: 'İzinler',     icon: Calendar,        roles: ['yonetici', 'saha_muhendisi'] },
   { href: '/raporlar',   label: 'Raporlar',    icon: BarChart3,       roles: ['yonetici'] },

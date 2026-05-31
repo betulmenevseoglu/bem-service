@@ -1,7 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Musteri } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -16,14 +17,37 @@ export default function YeniProjePage() {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [musteriler, setMusteriler] = useState<Musteri[]>([])
+  const [selectedMusteriId, setSelectedMusteriId] = useState<string>('')
   const [form, setForm] = useState({
     ad: '', musteri_firma: '', musteri_yetkili: '',
     musteri_telefon: '', musteri_email: '', adres: '', notlar: '',
   })
 
+  useEffect(() => {
+    supabase.from('musteriler').select('*').eq('aktif', true).order('firma_adi').then(({ data }) => {
+      setMusteriler(data ?? [])
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   function set(key: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm(f => ({ ...f, [key]: e.target.value }))
+  }
+
+  function handleMusteriSelect(e: React.ChangeEvent<HTMLSelectElement>) {
+    const musteriId = e.target.value
+    setSelectedMusteriId(musteriId)
+    if (musteriId) {
+      const m = musteriler.find(m => m.id === musteriId)
+      if (m) {
+        setForm(f => ({
+          ...f,
+          musteri_firma: m.firma_adi,
+          adres: f.adres || (m.adres ?? ''),
+        }))
+      }
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -37,6 +61,7 @@ export default function YeniProjePage() {
     const { data: { user } } = await supabase.auth.getUser()
     const { error: err } = await supabase.from('projeler').insert({
       ...form,
+      musteri_id: selectedMusteriId || null,
       musteri_yetkili: form.musteri_yetkili || null,
       musteri_telefon: form.musteri_telefon || null,
       musteri_email: form.musteri_email || null,
@@ -61,6 +86,19 @@ export default function YeniProjePage() {
         <CardContent className="pt-6">
           {error && <Alert variant="destructive" className="mb-4"><AlertDescription>{error}</AlertDescription></Alert>}
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-1.5">
+              <Label>Müşteri Seç <span className="text-muted-foreground text-xs">(opsiyonel)</span></Label>
+              <select
+                value={selectedMusteriId}
+                onChange={handleMusteriSelect}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">Müşteri Seç</option>
+                {musteriler.map(m => (
+                  <option key={m.id} value={m.id}>{m.firma_adi}</option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Proje Adı <span className="text-destructive">*</span></Label>
