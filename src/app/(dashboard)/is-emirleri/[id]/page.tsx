@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, FileText, Download, Calendar, MapPin, User, Wrench } from 'lucide-react'
+import { ArrowLeft, FileText, Download, Calendar, MapPin, User, Wrench, Star } from 'lucide-react'
 
 const durumRengi: Record<IsEmriDurumu, string> = {
   atandi: 'bg-slate-100 text-slate-700',
@@ -31,14 +31,15 @@ export default async function IsEmriDetayPage({ params }: { params: Promise<{ id
       *,
       proje:projeler(*),
       olusturan:profiles!olusturan_id(ad_soyad),
-      muhendisler:is_emri_muhendisleri(muhendis:profiles(*))
+      muhendisler:is_emri_muhendisleri(usta_mi, muhendis:profiles(*))
     `)
     .eq('id', id)
     .single()
 
   if (!ie) notFound()
 
-  const muhendisler = (ie.muhendisler as any[]).map((m: any) => m.muhendis).filter(Boolean)
+  const muhendisWithMeta = (ie.muhendisler as any[]).map((m: any) => ({ ...m.muhendis, usta_mi: m.usta_mi })).filter((m: any) => m?.id)
+  const muhendisler = muhendisWithMeta
   const isAtanan = muhendisler.some((m: any) => m.id === user.id)
   const canViewForm = myProfile?.rol === 'yonetici' || isAtanan
 
@@ -135,6 +136,11 @@ export default async function IsEmriDetayPage({ params }: { params: Promise<{ id
                   {m.ad_soyad.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                 </div>
                 <span className="text-sm font-medium">{m.ad_soyad}</span>
+                {m.usta_mi && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-[#1FBFB8]/10 text-[#1FBFB8]">
+                    <Star className="h-3 w-3 fill-current" /> Yetkili
+                  </span>
+                )}
                 {m.id === user.id && <Badge variant="outline" className="text-xs">Siz</Badge>}
               </div>
             ))}

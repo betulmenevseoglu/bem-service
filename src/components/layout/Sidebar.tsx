@@ -1,8 +1,10 @@
 'use client'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { LayoutDashboard, ClipboardList, Building2, Calendar, CalendarDays, BarChart3, Users, LogOut, X, UserCircle } from 'lucide-react'
@@ -13,19 +15,48 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { href: '/',           label: 'Ana Panel',   icon: LayoutDashboard, roles: ['yonetici', 'saha_muhendisi'] },
-  { href: '/is-emirleri',label: 'İş Emirleri', icon: ClipboardList,   roles: ['yonetici', 'saha_muhendisi'] },
-  { href: '/takvim',     label: 'Takvim',      icon: CalendarDays,    roles: ['yonetici', 'saha_muhendisi'] },
-  { href: '/musteriler', label: 'Müşteriler',  icon: Users,           roles: ['yonetici'] },
-  { href: '/projeler',   label: 'Projeler',    icon: Building2,       roles: ['yonetici'] },
-  { href: '/izinler',    label: 'İzinler',     icon: Calendar,        roles: ['yonetici', 'saha_muhendisi'] },
-  { href: '/raporlar',   label: 'Raporlar',    icon: BarChart3,       roles: ['yonetici'] },
-  { href: '/kullanicilar',label: 'Kullanıcılar',icon: Users,          roles: ['yonetici'] },
+  { href: '/',             label: 'Ana Panel',    icon: LayoutDashboard, roles: ['yonetici', 'saha_muhendisi'] },
+  { href: '/is-emirleri',  label: 'İş Emirleri',  icon: ClipboardList,   roles: ['yonetici', 'saha_muhendisi'] },
+  { href: '/takvim',       label: 'Takvim',       icon: CalendarDays,    roles: ['yonetici', 'saha_muhendisi'] },
+  { href: '/musteriler',   label: 'Müşteriler',   icon: Users,           roles: ['yonetici'] },
+  { href: '/projeler',     label: 'Projeler',     icon: Building2,       roles: ['yonetici'] },
+  { href: '/izinler',      label: 'İzinler',      icon: Calendar,        roles: ['yonetici', 'saha_muhendisi'] },
+  { href: '/raporlar',     label: 'Raporlar',     icon: BarChart3,       roles: ['yonetici'] },
+  { href: '/kullanicilar', label: 'Kullanıcılar', icon: Users,           roles: ['yonetici'] },
 ]
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname()
   const { profile, signOut } = useAuth()
+  const supabase = createClient()
+  const [bekleyenIzin, setBekleyenIzin] = useState(0)
+
+  // Bekleyen izin sayısını çek — sadece yönetici için
+  useEffect(() => {
+    if (profile?.rol !== 'yonetici') return
+
+    async function fetchBekleyen() {
+      const { count } = await supabase
+        .from('izin_talepleri')
+        .select('*', { count: 'exact', head: true })
+        .eq('durum', 'beklemede')
+      setBekleyenIzin(count ?? 0)
+    }
+
+    fetchBekleyen()
+
+    // Realtime: yeni izin talebi gelince otomatik güncelle
+    const channel = supabase
+      .channel('izin-bildirimleri')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'izin_talepleri' },
+        () => { fetchBekleyen() }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [profile?.rol]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const visibleItems = navItems.filter(item =>
     profile?.rol ? item.roles.includes(profile.rol) : false
@@ -35,6 +66,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     if (href === '/') return pathname === '/'
     return pathname.startsWith(href)
   }
+
+  const showIzinBadge = (href: string) =>
+    href === '/izinler' && profile?.rol === 'yonetici' && bekleyenIzin > 0
 
   return (
     <>
@@ -81,7 +115,17 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               )}
             >
               <item.icon className="h-4 w-4 flex-shrink-0" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {showIzinBadge(item.href) && (
+                <span className={cn(
+                  'h-5 min-w-5 rounded-full text-xs font-bold flex items-center justify-center px-1.5 leading-none',
+                  isActive(item.href)
+                    ? 'bg-white text-[#1FBFB8]'
+                    : 'bg-red-500 text-white'
+                )}>
+                  {bekleyenIzin > 9 ? '9+' : bekleyenIzin}
+                </span>
+              )}
             </Link>
           ))}
         </nav>

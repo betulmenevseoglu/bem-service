@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, ArrowLeft, Save, CheckCircle, Download, Lock } from 'lucide-react'
+import { Loader2, ArrowLeft, Save, CheckCircle, Download, Lock, Star, Eye } from 'lucide-react'
 import Link from 'next/link'
 
 export default function SahaServisFormuPage() {
@@ -31,8 +31,9 @@ export default function SahaServisFormuPage() {
   const [servisFormuId, setServisFormuId] = useState<string | null>(null)
   const [formTamamlandi, setFormTamamlandi] = useState(false)
   const [fotograflar, setFotograflar] = useState<ServisFotograf[]>([])
-  const [imzalar, setImzalar] = useState<Record<string, string>>({})
-  const [muhendisImzaUrller, setMuhendisImzaUrller] = useState<Record<string, string>>({})
+  // Baş mühendis imzası (tek imza)
+  const [ustaMuhendisImzaUrl, setUstaMuhendisImzaUrl] = useState<string | null>(null)
+  const [ustaMuhendisImzaDataUrl, setUstaMuhendisImzaDataUrl] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     fiili_baslangic: '',
@@ -53,7 +54,7 @@ export default function SahaServisFormuPage() {
 
       const { data: ie } = await supabase
         .from('is_emirleri')
-        .select('*, proje:projeler(*), muhendisler:is_emri_muhendisleri(muhendis:profiles(*))')
+        .select('*, proje:projeler(*), muhendisler:is_emri_muhendisleri(usta_mi, muhendis:profiles(*))')
         .eq('id', isEmriId)
         .single()
 
@@ -87,7 +88,7 @@ export default function SahaServisFormuPage() {
           } catch {
             setMusteriImzaUrl(sf.musteri_imza_url)
           }
-          setFormTamamlandi(true) // Müşteri imzası varsa form kilitli
+          setFormTamamlandi(true)
         }
 
         const { data: fotos } = await supabase
@@ -97,19 +98,19 @@ export default function SahaServisFormuPage() {
           .order('sira')
         setFotograflar(fotos ?? [])
 
+        // Baş mühendis imzasını yükle
         const { data: imzaRows } = await supabase
           .from('servis_formu_imzalari')
           .select('*')
           .eq('servis_formu_id', sf.id)
+          .limit(1)
 
-        const urlMap: Record<string, string> = {}
-        for (const imza of imzaRows ?? []) {
+        if (imzaRows && imzaRows.length > 0) {
           try {
-            const url = await getImzaSignedUrl(imza.imza_url)
-            urlMap[imza.muhendis_id] = url
+            const url = await getImzaSignedUrl(imzaRows[0].imza_url)
+            setUstaMuhendisImzaUrl(url)
           } catch {}
         }
-        setMuhendisImzaUrller(urlMap)
       } else {
         setForm(f => ({ ...f, fiili_baslangic: planStr, fiili_bitis: nowStr }))
       }
@@ -117,11 +118,10 @@ export default function SahaServisFormuPage() {
       setLoading(false)
     }
     load()
-  }, [isEmriId])
+  }, [isEmriId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function ensureServisFormu(): Promise<string> {
     if (servisFormuId) return servisFormuId
-    // Boş string Supabase timestamptz kolonunda null'a dönüşür — koruma ekle
     const now = new Date().toISOString().slice(0, 16)
     const { data: sf, error: err } = await supabase.from('servis_formlari').insert({
       is_emri_id: isEmriId,
@@ -137,38 +137,14 @@ export default function SahaServisFormuPage() {
     return sf.id
   }
 
-  async function uploadImza(dataUrl: string, isMusteri: boolean, muhendisId?: string): Promise<string> {
+  async function uploadImza(dataUrl: string, isMusteri: boolean, suffix?: string): Promise<string> {
     const res = await fetch(dataUrl)
     const blob = await res.blob()
-    const suffix = isMusteri ? 'musteri' : muhendisId
-    const path = `imzalar/${isEmriId}/${suffix}.png`
+    const tag = isMusteri ? 'musteri' : (suffix ?? 'usta')
+    const path = `imzalar/${isEmriId}/${tag}.png`
     const { error } = await supabase.storage.from('imzalar').upload(path, blob, { contentType: 'image/png', upsert: true })
     if (error) throw error
     return path
-  }
-
-  // Form tamamlandıktan sonra yalnızca kendi imzasını ekleyen mühendis için
-  async function handleSadecImzaKaydet() {
-    if (!servisFormuId || !imzalar[user.id]) return
-    setSaving(true)
-    setError(null)
-    try {
-      const imzaPath = await uploadImza(imzalar[user.id], false, user.id)
-      await supabase.from('servis_formu_imzalari').upsert({
-        servis_formu_id: servisFormuId,
-        muhendis_id: user.id,
-        imza_url: imzaPath,
-        imza_tarihi: new Date().toISOString(),
-      }, { onConflict: 'servis_formu_id,muhendis_id' })
-      const signedUrl = await getImzaSignedUrl(imzaPath)
-      setMuhendisImzaUrller(prev => ({ ...prev, [user.id]: signedUrl }))
-      setImzalar(prev => { const n = { ...prev }; delete n[user.id]; return n })
-      setSuccess('İmzanız başarıyla kaydedildi.')
-      setTimeout(() => setSuccess(null), 4000)
-    } catch (err: any) {
-      setError(err.message)
-    }
-    setSaving(false)
   }
 
   async function handleKaydet(tamamla = false) {
@@ -216,18 +192,21 @@ export default function SahaServisFormuPage() {
 
       if (updateErr) throw new Error(updateErr.message)
 
-      for (const [muhendisId, dataUrl] of Object.entries(imzalar)) {
-        const imzaPath = await uploadImza(dataUrl, false, muhendisId)
+      // Baş mühendis imzasını kaydet
+      if (ustaMuhendisImzaDataUrl) {
+        const imzaPath = await uploadImza(ustaMuhendisImzaDataUrl, false, user.id)
         await supabase.from('servis_formu_imzalari').upsert({
           servis_formu_id: sfId,
-          muhendis_id: muhendisId,
+          muhendis_id: user.id,
           imza_url: imzaPath,
           imza_tarihi: new Date().toISOString(),
         }, { onConflict: 'servis_formu_id,muhendis_id' })
+        const signedUrl = await getImzaSignedUrl(imzaPath)
+        setUstaMuhendisImzaUrl(signedUrl)
+        setUstaMuhendisImzaDataUrl(null)
       }
 
       if (tamamla) {
-        // İş emri durumunu güncelle — RLS kısıtlaması nedeniyle API üzerinden
         const yeniDurum = form.is_tamamlandi ? 'tamamlandi' : 'tamamlanmadi'
         await fetch(`/api/is-emri/${isEmriId}/durum`, {
           method: 'POST',
@@ -236,7 +215,6 @@ export default function SahaServisFormuPage() {
         })
         router.push(`/is-emirleri/${isEmriId}`)
       } else {
-        // Taslak kaydedildi → iş emri "devam ediyor" durumuna geçsin
         await fetch(`/api/is-emri/${isEmriId}/durum`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -259,13 +237,24 @@ export default function SahaServisFormuPage() {
 
   if (!isEmri) return null
 
-  const muhendisler = (isEmri.muhendisler ?? []).map((m: any) => m.muhendis).filter(Boolean)
+  const muhendisAtamalar = isEmri.muhendisler ?? []
+  const muhendisler = muhendisAtamalar.map((m: any) => m.muhendis).filter(Boolean)
   const isAtanan = muhendisler.some((m: any) => m.id === user?.id)
-  // Düzenlenebilir mi? Atanan mühendis + form henüz tamamlanmamış olmalı
-  const canEdit = isAtanan && !formTamamlandi
-  // İmza atabilir mi? Form tamamlansa bile henüz imzalamamış atanan mühendis imza atabilir
-  const benImzaladimMi = !!muhendisImzaUrller[user?.id]
-  const canSign = isAtanan && !benImzaladimMi && !!servisFormuId
+
+  // Backward compat: eski iş emirlerinde usta_mi yoksa tüm atananlar düzenleyebilir
+  const hasUsta = muhendisAtamalar.some((m: any) => m.usta_mi)
+  const isMaster = hasUsta
+    ? muhendisAtamalar.some((m: any) => m.muhendis?.id === user?.id && m.usta_mi)
+    : isAtanan
+
+  // Yetkili mühendis bilgisi — sadece usta_mi=true olan kişi, fallback yok
+  const ustaMuhendisEntry = muhendisAtamalar.find((m: any) => m.usta_mi)
+  const ustaMuhendis = ustaMuhendisEntry?.muhendis ?? null
+
+  // Erişim kuralları
+  const canEdit = isMaster && !formTamamlandi        // sadece baş mühendis doldurabilir
+  const benImzaladimMi = !!ustaMuhendisImzaUrl       // baş mühendis zaten imzaladı mı
+  const canSign = isMaster && !benImzaladimMi && !!servisFormuId
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-8">
@@ -287,14 +276,22 @@ export default function SahaServisFormuPage() {
         )}
       </div>
 
+      {/* Okuma modu banner — atanan ama yetkili mühendis olmayan */}
+      {isAtanan && !isMaster && (
+        <Alert className="border-slate-200 bg-slate-50">
+          <Eye className="h-4 w-4 text-slate-500" />
+          <AlertDescription className="text-slate-600">
+            Bu formu yalnızca görüntülüyorsunuz.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Form tamamlandı banner */}
-      {formTamamlandi && (
-        <Alert className={canSign ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'}>
-          <Lock className={`h-4 w-4 ${canSign ? 'text-amber-600' : 'text-green-600'}`} />
-          <AlertDescription className={`font-medium ${canSign ? 'text-amber-700' : 'text-green-700'}`}>
-            {canSign
-              ? 'Bu form tamamlanmıştır ancak henüz imzalamadınız. Aşağıdan imzanızı ekleyebilirsiniz.'
-              : 'Bu form müşteri tarafından imzalanmış ve tamamlanmıştır. Düzenleme yapılamaz.'}
+      {formTamamlandi && isMaster && !canSign && (
+        <Alert className="border-green-200 bg-green-50">
+          <Lock className="h-4 w-4 text-green-600" />
+          <AlertDescription className="font-medium text-green-700">
+            Bu form müşteri tarafından imzalanmış ve tamamlanmıştır. Düzenleme yapılamaz.
           </AlertDescription>
         </Alert>
       )}
@@ -316,6 +313,13 @@ export default function SahaServisFormuPage() {
             <div><span className="text-muted-foreground">Tesis Adresi:</span> <span className="font-medium">{isEmri.proje.adres}</span></div>
           )}
           <div><span className="text-muted-foreground">İş Tanımı:</span> <span className="font-medium">{isEmri.is_tanimi}</span></div>
+          {ustaMuhendisEntry && ustaMuhendis && (
+            <div className="flex items-center gap-1.5 pt-1">
+              <Star className="h-3.5 w-3.5 text-[#1FBFB8] fill-current" />
+              <span className="text-muted-foreground">Yetkili Mühendis:</span>
+              <span className="font-medium text-[#1FBFB8]">{ustaMuhendis.ad_soyad}</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -362,7 +366,7 @@ export default function SahaServisFormuPage() {
         </CardContent>
       </Card>
 
-      {/* Bölüm 4: Fotoğraflar — taslak kaydı beklenmez */}
+      {/* Bölüm 4: Fotoğraflar */}
       <Card>
         <CardHeader><CardTitle className="text-base">Saha Fotoğrafları</CardTitle></CardHeader>
         <CardContent>
@@ -423,34 +427,34 @@ export default function SahaServisFormuPage() {
       <Card>
         <CardHeader><CardTitle className="text-base">İmzalar</CardTitle></CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Saha Mühendisi İmzaları</p>
-            {muhendisler.map((m: any) => {
-              const isMe = m.id === user?.id
-              const mevcutUrl = muhendisImzaUrller[m.id] ?? null
-              return (
-                <div key={m.id}>
-                  <p className="text-sm font-medium mb-2">{m.ad_soyad}{isMe && <span className="text-xs text-[#1FBFB8] ml-2">(Siz)</span>}</p>
-                  {isMe ? (
-                    <ImzaAlani
-                      mevcutImzaUrl={mevcutUrl}
-                      onSave={dataUrl => setImzalar(prev => ({ ...prev, [m.id]: dataUrl }))}
-                      disabled={!canEdit && !canSign}
-                    />
-                  ) : mevcutUrl ? (
-                    <ImzaAlani mevcutImzaUrl={mevcutUrl} onSave={() => {}} disabled />
-                  ) : (
-                    <div className="border-2 border-dashed rounded-lg p-4 text-center text-muted-foreground text-sm">
-                      Mühendis henüz imzalamadı
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+
+          {/* Yetkili Mühendis İmzası — tek imza */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Star className="h-4 w-4 text-[#1FBFB8] fill-current" />
+              <p className="text-sm font-semibold">
+                {ustaMuhendis?.ad_soyad ?? 'Yetkili Mühendis'}
+                {isMaster && <span className="text-xs text-[#1FBFB8] ml-2">(Siz)</span>}
+              </p>
+            </div>
+            {isMaster ? (
+              <ImzaAlani
+                mevcutImzaUrl={ustaMuhendisImzaUrl}
+                onSave={setUstaMuhendisImzaDataUrl}
+                disabled={!canEdit && !canSign}
+              />
+            ) : ustaMuhendisImzaUrl ? (
+              <ImzaAlani mevcutImzaUrl={ustaMuhendisImzaUrl} onSave={() => {}} disabled />
+            ) : (
+              <div className="border-2 border-dashed rounded-lg p-4 text-center text-muted-foreground text-sm">
+                Yetkili mühendis henüz imzalamadı
+              </div>
+            )}
           </div>
 
           <Separator />
 
+          {/* Müşteri Onayı */}
           <div className="space-y-4">
             <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Müşteri Onayı</p>
             <div className="space-y-1.5">
@@ -472,7 +476,7 @@ export default function SahaServisFormuPage() {
         </CardContent>
       </Card>
 
-      {/* Kaydet butonları — form düzenlenebilir */}
+      {/* Kaydet butonları — sadece baş mühendis */}
       {canEdit && (
         <div className="flex gap-3">
           <Button variant="outline" className="flex-1" onClick={() => handleKaydet(false)} disabled={saving}>
@@ -486,12 +490,12 @@ export default function SahaServisFormuPage() {
         </div>
       )}
 
-      {/* Form tamamlandı ama mühendis henüz imzalamamış — sadece imza kaydet */}
+      {/* Form tamamlandı ama baş mühendis henüz imzalamamış */}
       {!canEdit && canSign && (
         <Button
           className="w-full"
-          onClick={handleSadecImzaKaydet}
-          disabled={saving || !imzalar[user?.id]}
+          onClick={() => handleKaydet(false)}
+          disabled={saving || !ustaMuhendisImzaDataUrl}
         >
           {saving ? <Loader2 className="animate-spin h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
           İmzamı Kaydet
