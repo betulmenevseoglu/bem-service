@@ -167,7 +167,7 @@ export function DashboardContent({ profile, isEmirleri, kpi, bugunIsEmirleri, bu
           {isEmirleri.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">Henüz iş emri yok</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -210,6 +210,28 @@ export function DashboardContent({ profile, isEmirleri, kpi, bugunIsEmirleri, bu
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+
+          {/* Mobil kart görünümü */}
+          {isEmirleri.length > 0 && (
+            <div className="md:hidden divide-y">
+              {isEmirleri.map((ie: any) => (
+                <Link key={ie.id} href={`/is-emirleri/${ie.id}`} className="block p-4 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs font-bold text-[#1FBFB8]">{ie.emir_no ?? '—'}</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${durumRengi[ie.durum as IsEmriDurumu]}`}>
+                      {IS_EMRI_DURUM_LABELS[ie.durum as IsEmriDurumu]}
+                    </span>
+                  </div>
+                  <div className="font-medium text-sm">{ie.proje?.ad ?? '—'}</div>
+                  <div className="text-xs text-muted-foreground">{ie.proje?.musteri_firma}</div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span>{IS_TIPI_LABELS[ie.is_tipi as keyof typeof IS_TIPI_LABELS]}</span>
+                    <span>{formatTarih(ie.planlanan_baslangic)}</span>
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
         </CardContent>

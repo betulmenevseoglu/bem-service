@@ -51,7 +51,7 @@ export default async function MusterilerPage() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -101,6 +101,31 @@ export default async function MusterilerPage() {
                   })}
                 </TableBody>
               </Table>
+            </div>
+
+            {/* Mobil kart görünümü */}
+            <div className="md:hidden divide-y">
+              {(musteriler as MusteriWithYetkili[]).map((m) => {
+                const birincil = m.yetkilileri?.find(y => y.birincil) ?? m.yetkilileri?.[0] ?? null
+                const projeSayisi = (m as unknown as { projeler: { count: number }[] }).projeler?.[0]?.count ?? 0
+                return (
+                  <Link key={m.id} href={`/musteriler/${m.id}`} className="block p-4 space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-medium text-sm">{m.firma_adi}</span>
+                      <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${m.aktif ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {m.aktif ? 'Aktif' : 'Pasif'}
+                      </span>
+                    </div>
+                    {birincil && (
+                      <div className="text-xs text-muted-foreground">
+                        {birincil.ad_soyad}{birincil.telefon ? ` · ${birincil.telefon}` : ''}
+                      </div>
+                    )}
+                    {m.adres && <div className="text-xs text-muted-foreground line-clamp-2">{m.adres}</div>}
+                    <div className="text-xs text-muted-foreground">{projeSayisi} proje</div>
+                  </Link>
+                )
+              })}
             </div>
           </CardContent>
         </Card>

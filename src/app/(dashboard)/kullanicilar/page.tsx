@@ -31,7 +31,7 @@ export default async function KullanicilarPage() {
       </div>
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -70,6 +70,25 @@ export default async function KullanicilarPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobil kart görünümü */}
+          <div className="md:hidden divide-y">
+            {(kullanicilar ?? []).map((k: Profile) => (
+              <Link key={k.id} href={`/kullanicilar/${k.id}`} className="block p-4 space-y-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-medium text-sm">{k.ad_soyad}</span>
+                  <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${k.aktif ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {k.aktif ? 'Aktif' : 'Pasif'}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground break-all">{k.email}</div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span>{k.rol === 'yonetici' ? 'Yönetici' : 'Saha Mühendisi'}</span>
+                  {k.telefon && <span>{k.telefon}</span>}
+                </div>
+              </Link>
+            ))}
           </div>
         </CardContent>
       </Card>

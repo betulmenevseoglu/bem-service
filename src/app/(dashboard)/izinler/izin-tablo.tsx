@@ -51,7 +51,8 @@ export function IzinTablo({ izinler, isYonetici, showActions }: Props) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <>
+    <div className="hidden md:block overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -115,5 +116,50 @@ export function IzinTablo({ izinler, isYonetici, showActions }: Props) {
         </TableBody>
       </Table>
     </div>
+
+    {/* Mobil kart görünümü */}
+    <div className="md:hidden divide-y">
+      {izinler.map(izin => (
+        <div key={izin.id} className="p-4 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              {isYonetici && <p className="font-medium text-sm">{izin.muhendis?.ad_soyad ?? '—'}</p>}
+              <p className={isYonetici ? 'text-xs text-muted-foreground' : 'font-medium text-sm'}>
+                {IZIN_TURU_LABELS[izin.izin_turu as keyof typeof IZIN_TURU_LABELS] ?? izin.izin_turu}
+              </p>
+            </div>
+            <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${DURUM_BADGE[izin.durum]}`}>
+              {IZIN_DURUM_LABELS[izin.durum]}
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {fmt(izin.baslangic_tarihi)} – {fmt(izin.bitis_tarihi)} · <span className="font-medium text-foreground">{izin.toplam_gun} gün</span>
+          </div>
+          {showActions && (
+            <div className="flex gap-2 pt-1">
+              <Button
+                size="sm" variant="outline"
+                className="flex-1 text-green-600 border-green-200 hover:bg-green-50"
+                disabled={loadingId === izin.id}
+                onClick={() => handleAction(izin.id, 'onayla')}
+              >
+                {loadingId === izin.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                Onayla
+              </Button>
+              <Button
+                size="sm" variant="outline"
+                className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                disabled={loadingId === izin.id}
+                onClick={() => handleAction(izin.id, 'reddet')}
+              >
+                {loadingId === izin.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+                Reddet
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+    </>
   )
 }

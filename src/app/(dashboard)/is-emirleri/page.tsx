@@ -75,7 +75,7 @@ export default async function IsEmirleriPage() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -138,6 +138,41 @@ export default async function IsEmirleriPage() {
                   })}
                 </TableBody>
               </Table>
+            </div>
+
+            {/* Mobil kart görünümü */}
+            <div className="md:hidden divide-y">
+              {(isEmirleri ?? []).map((ie: any) => {
+                const muhendisler = (ie.muhendisler ?? []).map((m: any) => m.muhendis?.ad_soyad).filter(Boolean)
+                return (
+                  <div key={ie.id} className="p-4 flex items-start gap-2">
+                    <Link href={`/is-emirleri/${ie.id}`} className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-bold text-[#1FBFB8]">{ie.emir_no ?? '—'}</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${durumRengi[ie.durum as IsEmriDurumu]}`}>
+                          {IS_EMRI_DURUM_LABELS[ie.durum as IsEmriDurumu]}
+                        </span>
+                      </div>
+                      <div className="font-medium text-sm">{ie.proje?.ad ?? '—'}</div>
+                      <div className="text-xs text-muted-foreground">{ie.proje?.musteri_firma}</div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>{IS_TIPI_LABELS[ie.is_tipi as IsTipi]}</span>
+                        <span>{formatTarih(ie.planlanan_baslangic)}</span>
+                      </div>
+                      {muhendisler.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-0.5">
+                          {muhendisler.map((ad: string) => (
+                            <Badge key={ad} variant="outline" className="text-xs">{ad}</Badge>
+                          ))}
+                        </div>
+                      )}
+                    </Link>
+                    {myProfile?.rol === 'yonetici' && (
+                      <IsEmriSilButonu isEmriId={ie.id} emirNo={ie.emir_no} />
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
