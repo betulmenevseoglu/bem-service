@@ -9,7 +9,7 @@ interface TopBarProps {
 
 export function TopBar({ onMenuClick, title }: TopBarProps) {
   return (
-    <header className="h-16 border-b border-border bg-white flex items-center px-4 gap-4 sticky top-0 z-30">
+    <header className="h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] border-b border-border bg-white flex items-center px-4 gap-4 sticky top-0 z-30">
       <Button
         variant="ghost"
         size="icon"

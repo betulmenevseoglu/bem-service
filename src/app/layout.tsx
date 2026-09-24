@@ -15,6 +15,8 @@ export const viewport: Viewport = {
   themeColor: '#1FBFB8',
   width: 'device-width',
   initialScale: 1,
+  // iPhone çentik/durum çubuğu ve home göstergesi için safe-area değerlerini açar (env(safe-area-inset-*))
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
