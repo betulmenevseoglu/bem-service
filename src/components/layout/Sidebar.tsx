@@ -56,7 +56,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [profile?.rol]) // eslint-disable-line react-hooks/exhaustive-deps
+    // pathname bağımlılığı: izinler sayfasında onayla/reddet sonrası başka
+    // sayfaya geçildiğinde rozet realtime'a bağlı kalmadan da tazelensin
+  }, [profile?.rol, pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const visibleItems = navItems.filter(item =>
     profile?.rol ? item.roles.includes(profile.rol) : false

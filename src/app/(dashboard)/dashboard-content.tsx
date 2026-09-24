@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card' 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Briefcase, CheckCircle2, Clock, Plus, ArrowRight } from 'lucide-react'
+import { Briefcase, CheckCircle2, Plus, ArrowRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 interface Props {
   profile: Profile
   isEmirleri: any[]
-  kpi: { toplam: number; tamamlanan: number; bekleyen: number; aktiveMuhendis: number }
+  kpi: { toplam: number; tamamlanan: number; aktiveMuhendis: number }
   bugunIsEmirleri: any[]
   bugunIzinler: any[]
 }
@@ -46,7 +46,7 @@ export function DashboardContent({ profile, isEmirleri, kpi, bugunIsEmirleri, bu
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -80,21 +80,7 @@ export function DashboardContent({ profile, isEmirleri, kpi, bugunIsEmirleri, bu
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Bekleyen</p>
-                <p className="text-3xl font-bold mt-1">{kpi.bekleyen}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-amber-50 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-amber-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 4. Kart — Bugünün Programı */}
+        {/* 3. Kart — Bugünün Programı */}
         <Link href="/takvim" className="block">
           <Card className="h-full cursor-pointer hover:shadow-md hover:border-[#1FBFB8]/40 transition-all">
             <CardContent className="pt-6">

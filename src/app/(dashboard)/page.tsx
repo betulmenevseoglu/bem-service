@@ -40,11 +40,6 @@ export default async function DashboardPage() {
     .select('*', { count: 'exact', head: true })
     .eq('durum', 'tamamlandi')
 
-  const { count: bekleyenCount } = await supabase
-    .from('is_emirleri')
-    .select('*', { count: 'exact', head: true })
-    .in('durum', ['atandi', 'devam_ediyor'])
-
   const { count: muhendisCount } = await supabase
     .from('profiles')
     .select('*', { count: 'exact', head: true })
@@ -96,7 +91,6 @@ export default async function DashboardPage() {
       kpi={{
         toplam: toplamCount ?? 0,
         tamamlanan: tamamlananCount ?? 0,
-        bekleyen: bekleyenCount ?? 0,
         aktiveMuhendis: muhendisCount ?? 0,
       }}
       bugunIsEmirleri={(bugunIsEmirleri ?? []) as any[]}
