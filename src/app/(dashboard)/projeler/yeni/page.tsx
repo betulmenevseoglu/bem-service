@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Musteri } from '@/types'
+import { Musteri, ProjeTipi, PROJE_TIPI_LABELS } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -19,6 +19,8 @@ export default function YeniProjePage() {
   const [error, setError] = useState<string | null>(null)
   const [musteriler, setMusteriler] = useState<Musteri[]>([])
   const [selectedMusteriId, setSelectedMusteriId] = useState<string>('')
+  const [projeTipi, setProjeTipi] = useState<ProjeTipi | ''>('')
+  const [adamGunButcesi, setAdamGunButcesi] = useState<string>('')
   const [form, setForm] = useState({
     ad: '', musteri_firma: '', musteri_yetkili: '',
     musteri_telefon: '', musteri_email: '', adres: '', notlar: '',
@@ -56,6 +58,10 @@ export default function YeniProjePage() {
       setError('Proje adı ve müşteri firma zorunludur.')
       return
     }
+    if (!projeTipi) {
+      setError('Proje kategorisi seçilmelidir.')
+      return
+    }
     setLoading(true)
     setError(null)
     const { data: { user } } = await supabase.auth.getUser()
@@ -67,6 +73,8 @@ export default function YeniProjePage() {
       musteri_email: form.musteri_email || null,
       adres: form.adres || null,
       notlar: form.notlar || null,
+      proje_tipi: projeTipi || null,
+      adam_gun_butcesi: adamGunButcesi ? parseFloat(adamGunButcesi) : null,
       aktif: true,
       created_by: user?.id,
     })
@@ -100,6 +108,31 @@ export default function YeniProjePage() {
               </select>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Proje Kategorisi <span className="text-destructive">*</span></Label>
+                <select
+                  value={projeTipi}
+                  onChange={(e) => setProjeTipi(e.target.value as ProjeTipi | '')}
+                  required
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="" disabled>Kategori seçin...</option>
+                  {(Object.entries(PROJE_TIPI_LABELS) as [ProjeTipi, string][]).map(([val, label]) => (
+                    <option key={val} value={val}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Adam/Gün Bütçesi <span className="text-muted-foreground text-xs">(opsiyonel)</span></Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="Örn. 30"
+                  value={adamGunButcesi}
+                  onChange={(e) => setAdamGunButcesi(e.target.value)}
+                />
+              </div>
               <div className="space-y-1.5">
                 <Label>Proje Adı <span className="text-destructive">*</span></Label>
                 <Input placeholder="Acıbadem Hastanesi BMS Bakım" value={form.ad} onChange={set('ad')} required />

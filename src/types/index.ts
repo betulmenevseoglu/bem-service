@@ -4,11 +4,12 @@ export type IsTipi = 'garanti_kapsami' | 'acil_cagri' | 'spot_servis' | 'periyod
 export type IsEmriDurumu = 'atandi' | 'devam_ediyor' | 'tamamlandi' | 'tamamlanmadi' | 'iptal_edildi'
 export type IzinTuru = 'yillik' | 'mazeret' | 'raporlu'
 export type IzinDurumu = 'beklemede' | 'onaylandi' | 'reddedildi' | 'iptal'
+export type ProjeTipi = 'devreye_alma' | 'bakim' | 'spot_servis'
 
 // Tables
 export interface Profile { id: string; ad_soyad: string; email: string; telefon: string | null; rol: RolTuru; aktif: boolean; sifre_degistir_gerekli: boolean; created_at: string; updated_at: string }
-export interface Proje { id: string; ad: string; musteri_firma: string; musteri_yetkili: string | null; musteri_telefon: string | null; musteri_email: string | null; adres: string | null; notlar: string | null; aktif: boolean; created_at: string; created_by: string | null; musteri_id: string | null }
-export interface IsEmri { id: string; emir_no: string | null; proje_id: string; olusturan_id: string; is_tipi: IsTipi; is_tanimi: string; planlanan_baslangic: string; planlanan_bitis: string; durum: IsEmriDurumu; created_at: string; updated_at: string }
+export interface Proje { id: string; ad: string; musteri_firma: string; musteri_yetkili: string | null; musteri_telefon: string | null; musteri_email: string | null; adres: string | null; notlar: string | null; aktif: boolean; created_at: string; created_by: string | null; musteri_id: string | null; proje_tipi: ProjeTipi | null; adam_gun_butcesi: number | null }
+export interface IsEmri { id: string; emir_no: string | null; proje_id: string; olusturan_id: string; is_tipi: IsTipi; is_tanimi: string; planlanan_baslangic: string; planlanan_bitis: string; durum: IsEmriDurumu; adam_gun_dusumu: number; created_at: string; updated_at: string }
 export interface IsEmriMuhendis { is_emri_id: string; muhendis_id: string; atanma_tarihi: string }
 export interface ServisFormu { id: string; is_emri_id: string; fiili_baslangic: string; fiili_bitis: string; teknik_rapor: string; is_tamamlandi: boolean; tamamlanmama_nedeni: string | null; musteri_imza_url: string | null; musteri_imza_atan_ad: string | null; musteri_imza_tarihi: string | null; son_kaydeden_id: string | null; created_at: string; updated_at: string }
 export interface ServisFormuImza { servis_formu_id: string; muhendis_id: string; imza_url: string; imza_tarihi: string }
@@ -20,6 +21,11 @@ export interface Musteri { id: string; firma_adi: string; adres: string | null; 
 export interface MusteriYetkili { id: string; musteri_id: string; ad_soyad: string; unvan: string | null; telefon: string | null; email: string | null; birincil: boolean; created_at: string }
 export interface MusteriWithYetkili extends Musteri { yetkilileri: MusteriYetkili[]; proje_sayisi?: number }
 
+export interface ProjeMalzeme { id: string; proje_id: string; malzeme_adi: string; birim: string; planlanan_miktar: number; created_by: string | null; created_at: string }
+export interface ProjeSevkiyat { id: string; proje_id: string; irsaliye_no: string; sevk_tarihi: string; notlar: string | null; created_by: string | null; created_at: string }
+export interface ProjeSevkiyatSatiri { id: string; sevkiyat_id: string; malzeme_id: string; miktar: number }
+export interface ProjeSevkiyatWithSatirlar extends ProjeSevkiyat { satirlar: (ProjeSevkiyatSatiri & { malzeme: ProjeMalzeme })[] }
+
 // Joined/extended types for UI
 export interface IsEmriWithDetails extends IsEmri { proje: Proje; muhendisler: Profile[]; servis_formu?: ServisFormu | null }
 export interface ServisFormuWithDetails extends ServisFormu { is_emri: IsEmriWithDetails; fotograflar: ServisFotograf[]; imzalar: ServisFormuImza[]; muhendis_profilleri: Profile[] }
@@ -30,6 +36,7 @@ export const IS_TIPI_LABELS: Record<IsTipi, string> = { garanti_kapsami: 'Garant
 export const IS_EMRI_DURUM_LABELS: Record<IsEmriDurumu, string> = { atandi: 'Atandı', devam_ediyor: 'Devam Ediyor', tamamlandi: 'Tamamlandı', tamamlanmadi: 'Tamamlanmadı', iptal_edildi: 'İptal Edildi' }
 export const IZIN_TURU_LABELS: Record<IzinTuru, string> = { yillik: 'Yıllık İzin', mazeret: 'Mazeret İzni', raporlu: 'Raporlu İzin' }
 export const IZIN_DURUM_LABELS: Record<IzinDurumu, string> = { beklemede: 'Beklemede', onaylandi: 'Onaylandı', reddedildi: 'Reddedildi', iptal: 'İptal' }
+export const PROJE_TIPI_LABELS: Record<ProjeTipi, string> = { devreye_alma: 'Devreye Alma Projeleri', bakim: 'Bakım Projeleri', spot_servis: 'Spot Servis Projeleri' }
 
 // Rapor types
 export interface RaporFiltre { baslangic?: string; bitis?: string; muhendisIds?: string[]; projeIds?: string[]; isTipleri?: IsTipi[]; durumlar?: IsEmriDurumu[] }

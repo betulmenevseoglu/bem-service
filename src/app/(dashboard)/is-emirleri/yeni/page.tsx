@@ -23,6 +23,7 @@ export default function YeniIsEmriPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ustaMuhendisId, setUstaMuhendisId] = useState<string>('')
+  const [harcananAdamGun, setHarcananAdamGun] = useState(0)
 
   const form = useForm<IsEmriFormData>({
     resolver: zodResolver(isEmriSchema),
@@ -42,6 +43,52 @@ export default function YeniIsEmriPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedMuhendisIds = form.watch('muhendis_ids')
+  const secilenProjeId = form.watch('proje_id')
+  const planlananBaslangic = form.watch('planlanan_baslangic')
+  const planlananBitis = form.watch('planlanan_bitis')
+  const secilenProje = projeler.find(p => p.id === secilenProjeId) ?? null
+
+  // Seçilen projenin harcanan adam/gün toplamını çek — sadece TAMAMLANMIŞ iş emirleri
+  // bütçeyi etkiler (gerçek süreye göre); atandı/devam eden iş emirleri sayılmaz.
+  useEffect(() => {
+    if (!secilenProjeId) { setHarcananAdamGun(0); return }
+    supabase
+      .from('is_emirleri')
+      .select('adam_gun_dusumu')
+      .eq('proje_id', secilenProjeId)
+      .in('durum', ['tamamlandi', 'tamamlanmadi'])
+      .then(({ data }) => {
+        setHarcananAdamGun((data ?? []).reduce((sum, r) => sum + Number(r.adam_gun_dusumu ?? 0), 0))
+      })
+  }, [secilenProjeId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // İş günü sayısı: başlangıç-bitiş tarih aralığındaki hafta sonu (Cmt/Paz) hariç gün sayısı.
+  // Tek günlük (hafta sonuna denk gelse dahi) iş emirlerinde en az 1 gün sayılır.
+  function hesaplaIsGunuSayisi(bas: Date, bit: Date): number {
+    const cursor = new Date(bas.getFullYear(), bas.getMonth(), bas.getDate())
+    const son = new Date(bit.getFullYear(), bit.getMonth(), bit.getDate())
+    let sayac = 0
+    while (cursor <= son) {
+      const haftaGunu = cursor.getDay() // 0=Pazar, 6=Cumartesi
+      if (haftaGunu !== 0 && haftaGunu !== 6) sayac++
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    return Math.max(1, sayac)
+  }
+
+  // Bu iş emri için TAHMİNİ adam/gün (bilgi amaçlı): planlanan iş günü sayısı × atanan mühendis sayısı.
+  // Gerçek düşüm bütçeden ancak iş TAMAMLANDIĞINDA, fiili süreye göre yapılır — burada sadece öngörü gösterilir.
+  function hesaplaTahminiAdamGun(): number {
+    if (!planlananBaslangic || !planlananBitis || selectedMuhendisIds.length === 0) return 0
+    const bas = new Date(planlananBaslangic)
+    const bit = new Date(planlananBitis)
+    if (isNaN(bas.getTime()) || isNaN(bit.getTime()) || bit <= bas) return 0
+    return hesaplaIsGunuSayisi(bas, bit) * selectedMuhendisIds.length
+  }
+
+  const tahminiAdamGun = hesaplaTahminiAdamGun()
+  const projeButcesi = secilenProje?.adam_gun_butcesi ?? null
+  const kalanButce = projeButcesi != null ? projeButcesi - harcananAdamGun : null
 
   function toggleMuhendis(id: string) {
     const current = form.getValues('muhendis_ids')
@@ -198,6 +245,21 @@ export default function YeniIsEmriPage() {
                   <FormMessage />
                 </FormItem>
               )} />
+
+              {/* Adam/gün bilgisi — sadece tahmin, iş tamamlanınca gerçek süreye göre düşer */}
+              {tahminiAdamGun > 0 && (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm space-y-1">
+                  <p>
+                    Tahmini adam/gün: <span className="font-semibold">{tahminiAdamGun}</span>
+                    <span className="text-muted-foreground"> (planlanan tarihlere göre — iş tamamlandığında gerçek süreye göre düşülecek)</span>
+                  </p>
+                  {projeButcesi != null && (
+                    <p className="text-muted-foreground">
+                      Proje bütçesi: {projeButcesi} · Tamamlanan işlerden harcanan: {harcananAdamGun} · Kalan: {kalanButce} adam/gün
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Baş mühendis seçimi — 2+ mühendis seçilince görünür */}
               {selectedMuhendisIds.length >= 2 && (
