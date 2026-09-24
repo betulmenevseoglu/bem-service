@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="tr" className={inter.variable}>
       <head>
-        <link rel="apple-touch-icon" href="/logo-bem.png" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </head>
       <body className="min-h-screen bg-background antialiased" suppressHydrationWarning>
         {children}
