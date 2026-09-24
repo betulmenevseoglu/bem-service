@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, FileText, Download, Calendar, MapPin, User, Wrench, Star } from 'lucide-react'
+import { IsEmriSilButonu } from '../is-emri-sil-butonu'
 
 const durumRengi: Record<IsEmriDurumu, string> = {
   atandi: 'bg-slate-100 text-slate-700',
@@ -64,6 +65,9 @@ export default async function IsEmriDetayPage({ params }: { params: Promise<{ id
           </div>
           <h1 className="text-xl font-bold mt-0.5 truncate">{ie.proje?.ad}</h1>
         </div>
+        {myProfile?.rol === 'yonetici' && (
+          <IsEmriSilButonu isEmriId={id} emirNo={ie.emir_no} redirectTo="/is-emirleri" />
+        )}
         {canViewForm && (
           <Button asChild>
             <Link href={`/is-emirleri/${id}/form`}>

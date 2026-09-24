@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, ClipboardList, ExternalLink } from 'lucide-react'
+import { IsEmriSilButonu } from './is-emri-sil-butonu'
 
 const durumRengi: Record<IsEmriDurumu, string> = {
   atandi: 'bg-slate-100 text-slate-700',
@@ -121,11 +122,16 @@ export default async function IsEmirleriPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/is-emirleri/${ie.id}`}>
-                              <ExternalLink className="h-4 w-4" />
-                            </Link>
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/is-emirleri/${ie.id}`}>
+                                <ExternalLink className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                            {myProfile?.rol === 'yonetici' && (
+                              <IsEmriSilButonu isEmriId={ie.id} emirNo={ie.emir_no} />
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     )
