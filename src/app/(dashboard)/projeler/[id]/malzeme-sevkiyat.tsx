@@ -22,6 +22,16 @@ interface SevkSatiri {
   miktar: string
 }
 
+interface MalzemeSatiri {
+  malzeme_adi: string
+  birim: string
+  planlanan_miktar: string
+}
+
+function bosMalzemeSatiri(): MalzemeSatiri {
+  return { malzeme_adi: '', birim: 'Adet', planlanan_miktar: '' }
+}
+
 const BOS_SEVKIYAT_FORM = {
   irsaliyeNo: '',
   sevkTarihi: new Date().toISOString().split('T')[0],
@@ -39,9 +49,7 @@ export function MalzemeSevkiyat({ projeId }: Props) {
   // Malzeme ekle/düzenle
   const [malzemeDialogOpen, setMalzemeDialogOpen] = useState(false)
   const [malzemeDuzenlenen, setMalzemeDuzenlenen] = useState<ProjeMalzeme | null>(null)
-  const [malzemeAdi, setMalzemeAdi] = useState('')
-  const [birim, setBirim] = useState('Adet')
-  const [planlananMiktar, setPlanlananMiktar] = useState('')
+  const [malzemeSatirlari, setMalzemeSatirlari] = useState<MalzemeSatiri[]>([bosMalzemeSatiri()])
   const [malzemeSaving, setMalzemeSaving] = useState(false)
   const [malzemeError, setMalzemeError] = useState<string | null>(null)
 
@@ -93,36 +101,52 @@ export function MalzemeSevkiyat({ projeId }: Props) {
     setMalzemeError(null)
     if (m) {
       setMalzemeDuzenlenen(m)
-      setMalzemeAdi(m.malzeme_adi)
-      setBirim(m.birim)
-      setPlanlananMiktar(String(m.planlanan_miktar))
+      setMalzemeSatirlari([{ malzeme_adi: m.malzeme_adi, birim: m.birim, planlanan_miktar: String(m.planlanan_miktar) }])
     } else {
       setMalzemeDuzenlenen(null)
-      setMalzemeAdi('')
-      setBirim('Adet')
-      setPlanlananMiktar('')
+      setMalzemeSatirlari([bosMalzemeSatiri()])
     }
     setMalzemeDialogOpen(true)
   }
 
+  function malzemeSatiriGuncelle(index: number, patch: Partial<MalzemeSatiri>) {
+    setMalzemeSatirlari(rows => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+  }
+
+  function malzemeSatiriEkle() {
+    setMalzemeSatirlari(rows => [...rows, bosMalzemeSatiri()])
+  }
+
+  function malzemeSatiriSil(index: number) {
+    setMalzemeSatirlari(rows => rows.filter((_, i) => i !== index))
+  }
+
   async function handleMalzemeKaydet(e: React.FormEvent) {
     e.preventDefault()
-    if (!malzemeAdi.trim()) { setMalzemeError('Malzeme adı zorunludur.'); return }
+
+    // Tamamen boş satırlar yok sayılır; adı boş ama miktarı dolu satır hatadır
+    const dolu = malzemeSatirlari.filter(s => s.malzeme_adi.trim() || s.planlanan_miktar.trim())
+    if (dolu.some(s => !s.malzeme_adi.trim())) { setMalzemeError('Miktar girilen her satırda malzeme adı zorunludur.'); return }
+    if (dolu.length === 0) { setMalzemeError('Malzeme adı zorunludur.'); return }
+
     setMalzemeSaving(true)
     setMalzemeError(null)
 
-    const payload = {
-      malzeme_adi: malzemeAdi.trim(),
-      birim: birim.trim() || 'Adet',
-      planlanan_miktar: parseFloat(planlananMiktar) || 0,
-    }
+    const payloads = dolu.map(s => ({
+      malzeme_adi: s.malzeme_adi.trim(),
+      birim: s.birim.trim() || 'Adet',
+      planlanan_miktar: parseFloat(s.planlanan_miktar) || 0,
+    }))
 
     if (malzemeDuzenlenen) {
-      const { error } = await supabase.from('proje_malzemeleri').update(payload).eq('id', malzemeDuzenlenen.id)
+      const { error } = await supabase.from('proje_malzemeleri').update(payloads[0]).eq('id', malzemeDuzenlenen.id)
       if (error) { setMalzemeError(error.message); setMalzemeSaving(false); return }
     } else {
+      // Tüm satırlar tek istekte eklenir: biri hata verirse hiçbiri eklenmez
       const { data: { user } } = await supabase.auth.getUser()
-      const { error } = await supabase.from('proje_malzemeleri').insert({ proje_id: projeId, created_by: user?.id, ...payload })
+      const { error } = await supabase.from('proje_malzemeleri').insert(
+        payloads.map(p => ({ proje_id: projeId, created_by: user?.id, ...p }))
+      )
       if (error) { setMalzemeError(error.message); setMalzemeSaving(false); return }
     }
 
@@ -270,30 +294,73 @@ export function MalzemeSevkiyat({ projeId }: Props) {
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" onClick={() => openMalzemeDialog()}><Plus className="h-4 w-4" /> Malzeme Ekle</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>{malzemeDuzenlenen ? 'Malzeme Düzenle' : 'Yeni Malzeme'}</DialogTitle>
-                <DialogDescription>Projeye ait malzeme kalemini {malzemeDuzenlenen ? 'güncelleyin' : 'ekleyin'}.</DialogDescription>
+                <DialogTitle>{malzemeDuzenlenen ? 'Malzeme Düzenle' : 'Malzeme Ekle'}</DialogTitle>
+                <DialogDescription>
+                  {malzemeDuzenlenen
+                    ? 'Projeye ait malzeme kalemini güncelleyin.'
+                    : 'Projeye ait malzeme kalemlerini satır satır girin, hepsi tek seferde eklenir.'}
+                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleMalzemeKaydet} className="space-y-4">
                 {malzemeError && <Alert variant="destructive"><AlertDescription>{malzemeError}</AlertDescription></Alert>}
-                <div className="space-y-1.5">
-                  <Label>Malzeme Adı <span className="text-destructive">*</span></Label>
-                  <Input value={malzemeAdi} onChange={e => setMalzemeAdi(e.target.value)} placeholder="Örn. Yangın Alarm Dedektörü" />
+
+                <div className="space-y-3">
+                  {malzemeSatirlari.map((satir, i) => (
+                    <div key={i} className="space-y-2 rounded-lg border border-border p-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">
+                          {malzemeDuzenlenen ? 'Malzeme' : `Malzeme ${i + 1}`}
+                        </Label>
+                        {!malzemeDuzenlenen && (
+                          <Button
+                            type="button" variant="ghost" size="icon" className="h-6 w-6"
+                            onClick={() => malzemeSatiriSil(i)} disabled={malzemeSatirlari.length === 1}
+                            title="Satırı sil" aria-label="Satırı sil"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                        )}
+                      </div>
+                      <Input
+                        value={satir.malzeme_adi}
+                        onChange={e => malzemeSatiriGuncelle(i, { malzeme_adi: e.target.value })}
+                        placeholder="Malzeme adı (örn. Yangın Alarm Dedektörü)"
+                        autoFocus={i === malzemeSatirlari.length - 1 && malzemeSatirlari.length > 1}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          value={satir.birim}
+                          onChange={e => malzemeSatiriGuncelle(i, { birim: e.target.value })}
+                          placeholder="Birim (Adet, Metre, Kg...)"
+                        />
+                        <Input
+                          type="number" min="0" step="0.01"
+                          value={satir.planlanan_miktar}
+                          onChange={e => malzemeSatiriGuncelle(i, { planlanan_miktar: e.target.value })}
+                          placeholder="Planlanan miktar"
+                        />
+                      </div>
+                    </div>
+                  ))}
+
+                  {!malzemeDuzenlenen && (
+                    <Button type="button" variant="outline" size="sm" onClick={malzemeSatiriEkle}>
+                      <Plus className="h-3 w-3" /> Satır Ekle
+                    </Button>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label>Birim</Label>
-                    <Input value={birim} onChange={e => setBirim(e.target.value)} placeholder="Adet, Metre, Kg..." />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Planlanan Miktar</Label>
-                    <Input type="number" min="0" step="0.01" value={planlananMiktar} onChange={e => setPlanlananMiktar(e.target.value)} placeholder="0" />
-                  </div>
-                </div>
+
                 <DialogFooter>
                   <Button type="submit" disabled={malzemeSaving}>
-                    {malzemeSaving ? <><Loader2 className="animate-spin h-4 w-4" /> Kaydediliyor...</> : (malzemeDuzenlenen ? 'Güncelle' : 'Ekle')}
+                    {malzemeSaving
+                      ? <><Loader2 className="animate-spin h-4 w-4" /> Kaydediliyor...</>
+                      : malzemeDuzenlenen
+                        ? 'Güncelle'
+                        : malzemeSatirlari.filter(s => s.malzeme_adi.trim()).length > 1
+                          ? `${malzemeSatirlari.filter(s => s.malzeme_adi.trim()).length} Malzemeyi Ekle`
+                          : 'Ekle'}
                   </Button>
                 </DialogFooter>
               </form>
@@ -360,7 +427,7 @@ export function MalzemeSevkiyat({ projeId }: Props) {
             <DialogTrigger asChild>
               <Button size="sm" disabled={malzemeler.length === 0} onClick={() => openSevkiyatDialog()}><Plus className="h-4 w-4" /> Yeni Sevkiyat</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{sevkiyatDuzenlenen ? `Sevkiyat Düzenle — ${sevkiyatDuzenlenen.irsaliye_no}` : 'Yeni Sevkiyat / İrsaliye'}</DialogTitle>
                 <DialogDescription>İrsaliye bilgilerini ve gönderilen malzeme satırlarını girin.</DialogDescription>
