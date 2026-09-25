@@ -8,7 +8,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, ArrowLeft } from 'lucide-react'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog'
+import { Loader2, ArrowLeft, KeyRound, Copy, Check } from 'lucide-react'
 import Link from 'next/link'
 
 export default function KullaniciDuzenlePage() {
@@ -20,8 +23,17 @@ export default function KullaniciDuzenlePage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [form, setForm] = useState({ ad_soyad: '', telefon: '', rol: 'saha_muhendisi' as Profile['rol'] })
+  const [benimId, setBenimId] = useState<string | null>(null)
+
+  // Şifre sıfırlama
+  const [sifirlaOpen, setSifirlaOpen] = useState(false)
+  const [sifirlaLoading, setSifirlaLoading] = useState(false)
+  const [sifirlaError, setSifirlaError] = useState<string | null>(null)
+  const [tempPassword, setTempPassword] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setBenimId(user?.id ?? null))
     supabase.from('profiles').select('*').eq('id', id).single().then(({ data }) => {
       if (data) {
         setProfile(data)
@@ -30,6 +42,35 @@ export default function KullaniciDuzenlePage() {
       setLoading(false)
     })
   }, [id])
+
+  function closeSifirla() {
+    setSifirlaOpen(false)
+    setSifirlaError(null)
+    setTempPassword(null)
+    setCopied(false)
+  }
+
+  async function handleSifirla() {
+    setSifirlaLoading(true)
+    setSifirlaError(null)
+    try {
+      const res = await fetch(`/api/kullanici/${id}/sifre-sifirla`, { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) { setSifirlaError(json.error ?? 'Şifre sıfırlanamadı.'); return }
+      setTempPassword(json.temp_password)
+    } catch {
+      setSifirlaError('Sunucuya ulaşılamadı.')
+    } finally {
+      setSifirlaLoading(false)
+    }
+  }
+
+  function copyPassword() {
+    if (!tempPassword) return
+    navigator.clipboard.writeText(tempPassword)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -106,11 +147,67 @@ export default function KullaniciDuzenlePage() {
             </Button>
           </div>
 
+          {benimId && benimId !== profile.id && (
+            <div className="flex items-center justify-between py-2 border-t">
+              <div>
+                <Label>Şifre</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Geçici bir şifre oluşturur; kullanıcı ilk girişte değiştirir.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setSifirlaOpen(true)}>
+                <KeyRound className="h-4 w-4" /> Şifreyi Sıfırla
+              </Button>
+            </div>
+          )}
+
           <Button className="w-full" onClick={handleSave} disabled={saving}>
             {saving ? <><Loader2 className="animate-spin h-4 w-4" /> Kaydediliyor...</> : 'Kaydet'}
           </Button>
         </CardContent>
       </Card>
+
+      <Dialog open={sifirlaOpen} onOpenChange={(o) => { if (!o) closeSifirla() }}>
+        <DialogContent>
+          {tempPassword ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Yeni geçici şifre</DialogTitle>
+                <DialogDescription>
+                  {profile.ad_soyad} için şifre sıfırlandı. Bu şifre yalnızca şimdi gösterilir, kaydedip kullanıcıya iletin.
+                  Kullanıcı ilk girişte şifresini değiştirmek zorunda kalacak.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-4 py-3">
+                <code className="flex-1 text-lg font-mono font-bold tracking-wider break-all">{tempPassword}</code>
+                <Button variant="outline" size="icon" onClick={copyPassword}>
+                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button onClick={closeSifirla}>Kapat</Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>{profile.ad_soyad} için şifre sıfırlansın mı?</DialogTitle>
+                <DialogDescription>
+                  Kullanıcının mevcut şifresi geçersiz olur ve yeni bir geçici şifre oluşturulur.
+                  Kullanıcı ilk girişte kendi şifresini belirlemek zorunda kalır.
+                </DialogDescription>
+              </DialogHeader>
+              {sifirlaError && <Alert variant="destructive"><AlertDescription>{sifirlaError}</AlertDescription></Alert>}
+              <DialogFooter>
+                <Button variant="outline" onClick={closeSifirla} disabled={sifirlaLoading}>İptal</Button>
+                <Button variant="destructive" onClick={handleSifirla} disabled={sifirlaLoading}>
+                  {sifirlaLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Sıfırlanıyor...</> : 'Evet, Sıfırla'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
